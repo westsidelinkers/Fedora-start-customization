@@ -1,0 +1,22 @@
+# Tokyo Night — swaylock
+color=1a1b26
+inside-color=1a1b26
+inside-clear-color=1a1b26
+inside-caps-lock-color=1a1b26
+line-color=7aa2f7
+line-clear-color=7dcfff
+line-caps-lock-color=e0af68
+ring-color=414868
+ring-clear-color=7dcfff
+ring-caps-lock-color=e0af68
+key-hl-color=9ece6a
+bs-hl-color=f7768e
+separator-color=00000000
+text-color=c0caf5
+text-clear-color=7dcfff
+text-caps-lock-color=e0af68
+text-ver-color=7aa2f7
+text-wrong-color=f7768e
+font="JetBrainsMono Nerd Font"
+font-size=18
+show-failed-attempts

@@ -1,169 +1,301 @@
-# Fedora Sway Atomic — Tokyo Night Desktop Setup
+# Fedora Sway Atomic — Tokyo Night Desktop
 
-A record of the desktop customization work performed on Fedora Sway Atomic 44 using Sway, Waybar, Alacritty, Rofi, Dunst, Swaylock, GTK, and SDDM.
+A version-controlled record of the Tokyo Night desktop customizations applied to
+Fedora Sway Atomic 44.1.7.
 
-> **Documentation note:** This README is based on the changes and command outputs captured during setup. The verification section distinguishes checks observed at the time from checks to repeat after future edits; it is not a claim that every component was retested after the final change.
+## Repository structure
 
-## Contents
+```text
+Fedora-start-customization/
+├── README.md                          This file
+├── configs/
+│   ├── sway/
+│   │   └── config.d/                  Sway configuration fragments
+│   │       ├── 10-wallpaper.conf
+│   │       ├── 20-terminal.conf
+│   │       ├── 70-window-spacing.conf
+│   │       ├── 80-tokyonight-borders.conf
+│   │       ├── 85-rofi-launcher.conf
+│   │       ├── 90-terminal.conf
+│   │       └── 95-lockscreen.conf
+│   ├── alacritty/
+│   │   └── alacritty.toml
+│   ├── waybar/
+│   │   ├── config.jsonc
+│   │   └── style.css
+│   ├── rofi/
+│   │   ├── config.rasi
+│   │   └── tokyonight.rasi
+│   ├── dunst/
+│   │   └── dunstrc
+│   └── swaylock/
+│       └── config
+└── system/
+    └── sddm/
+        └── README.md                  SDDM theme documentation
+```
 
-- [Environment](#environment)
-- [Customization summary](#customization-summary)
-- [Configuration locations](#configuration-locations)
-- [Verification and tests](#verification-and-tests)
-- [Reloading and persistence](#reloading-and-persistence)
-- [Troubleshooting and recovery](#troubleshooting-and-recovery)
+## What is version-controlled
 
-## Environment
+All files under `copies/` are copies of the active user configuration files.
+They are safe to restore by copying back to `~/.config/`.
 
-| Component | Recorded version or detail |
-|---|---|
-| Operating system | Fedora Sway Atomic 44 |
-| Window manager | Sway `1.11-3.fc44.x86_64` |
-| Status bar | Waybar `0.15.0-1.fc44.x86_64` |
-| Terminal | Alacritty `0.17.0-1.fc44.x86_64` |
-| Launcher | Rofi |
-| Wallpaper utility | `swaybg` |
-| Login manager | SDDM |
-| Development environment | Fedora Toolbox; Podman preferred over Docker |
+| Repository path | Restore target |
+|-----------------|----------------|
+| `configs/sway/config.d/*.conf` | `~/.config/sway/config.d/` |
+| `configs/alacritty/alacritty.toml` | `~/.config/alacritty/alacritty.toml` |
+| `configs/waybar/config.jsonc` | `~/.config/waybar/config.jsonc` |
+| `configs/waybar/style.css` | `~/.config/waybar/style.css` |
+| `configs/rofi/config.rasi` | `~/.config/rofi/config.rasi` |
+| `configs/rofi/tokyonight.rasi` | `~/.config/rofi/tokyonight.rasi` |
+| `configs/dunst/dunstrc` | `~/.config/dunst/dunstrc` |
+| `configs/swaylock/config` | `~/.config/swaylock/config` |
 
-Versions were captured during setup and may differ after updates.
+## What is documented separately (not version-controlled)
 
-## Customization summary
+The SDDM login theme lives under `/usr/local/` and `/etc/` — these are system
+paths requiring root privileges. See [system/sddm/README.md](system/sddm/README.md)
+for full documentation, preview instructions, and revert procedures.
 
-### Wallpaper
+Key system paths:
 
-- Chose a dark wallpaper featuring an animal coding.
-- Stored it at `~/.local/share/backgrounds/wallpaper.png`.
-- Added a Sway config fragment to fill the display with this wallpaper.
+- `/etc/sddm.conf.d/99-tokyonight.conf` — theme selection override
+- `/usr/local/share/sddm/themes/TokyoNight/` — custom theme directory
+- `/usr/local/share/backgrounds/tokyonight-login.png` — login wallpaper
+
+## Fedora's layered-include mechanism
+
+Fedora's Sway configuration uses a layered-include system. The system
+configuration at `/usr/share/sway/config` (or `/etc/sway/config`) ends with:
+
+```
+include '$(/usr/libexec/sway/layered-include \
+  "/usr/share/sway/config.d/*.conf" \
+  "/etc/sway/config.d/*.conf" \
+  "${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d/*.conf")'
+```
+
+The `/usr/libexec/sway/layered-include` script expands each glob pattern,
+collects matching files, and layers them so that **files with the same name in
+later directories override earlier ones**. The load order is:
+
+1. `/usr/share/sway/config.d/*.conf` — Fedora packaged defaults
+2. `/etc/sway/config.d/*.conf` — system-wide overrides
+3. `~/.config/sway/config.d/*.conf` — user overrides (highest precedence)
+
+This means a user file like `~/.config/sway/config.d/20-swayidle.conf` will
+always be loaded instead of `/usr/share/sway/config.d/20-swayidle.conf` or
+`/etc/sway/config.d/20-swayidle.conf`.
+
+All custom Sway configuration lives in `~/.config/sway/config.d/` as numbered
+fragments. The numbers control load order — later fragments can override
+settings from earlier ones.
+
+## Sway configuration fragments
+
+### 10-wallpaper.conf
+
+Sets the desktop wallpaper:
+
+```
+output * bg ~/.local/share/backgrounds/wallpaper.png fill
+```
+
+### 20-terminal.conf
+
+Sets the `$term` variable to `alacritty`:
+
+```
+set $term alacritty
+```
+
+### 70-window-spacing.conf
+
+Sets initial gap values:
+
+```
+gaps inner 6
+gaps outer 3
+```
+
+### 80-tokyonight-borders.conf
+
+Sets Tokyo Night window border colors and **overrides** the gap values from
+`70-window-spacing.conf`:
+
+```
+default_border pixel 2
+default_floating_border pixel 2
+
+client.focused          #7aa2f7 #1a1b26 #c0caf5 #7aa2f7 #7aa2f7
+client.unfocused        #414868 #1a1b26 #a9b1d6 #414868 #414868
+client.focused_inactive #414868 #1a1b26 #a9b1d6 #414868 #414868
+client.urgent           #f7768e #1a1b26 #c0caf5 #f7768e #f7768e
+
+gaps outer 0
+gaps inner 0
+smart_gaps on
+hide_edge_borders smart
+```
+
+**Effective gap configuration** (after both fragments are loaded):
+
+| Setting | Value | Source |
+|---------|-------|--------|
+| `gaps inner` | `0` | Overridden by `80-tokyonight-borders.conf` |
+| `gaps outer` | `0` | Overridden by `80-tokyonight-borders.conf` |
+| `smart_gaps` | `on` | Set in `80-tokyonight-borders.conf` |
+| `hide_edge_borders` | `smart` | Set in `80-tokyonight-borders.conf` |
+
+**What this means in practice:**
+
+- `smart_gaps on` — when there is only one window on a workspace, inner gaps
+  are removed entirely so the window fills the full screen. When multiple
+  windows are present, the configured inner gap applies.
+- With `gaps inner 0` and `gaps outer 0`, windows touch each other and the
+  screen edges with no spacing.
+- `hide_edge_borders smart` — window borders are hidden when there is only one
+  window on a workspace or when using stacked/tabbed layouts, reducing visual
+  clutter.
+
+This is a deliberate choice to maximize screen real estate. The `70-window-spacing.conf`
+fragment is kept because it documents the initial spacing intent and may be
+useful as a reference, but its gap values are overridden by `80-tokyonight-borders.conf`.
+
+### 85-rofi-launcher.conf
+
+Rebinds `$mod+d` from the default combi launcher to `rofi -show drun`:
+
+```
+unbindsym $mod+d
+bindsym $mod+d exec rofi -show drun
+```
+
+### 90-terminal.conf
+
+Rebinds `$mod+Return` from the default terminal to `alacritty`:
+
+```
+unbindsym $mod+Return
+bindsym $mod+Return exec alacritty
+```
+
+### 95-lockscreen.conf
+
+Binds `$mod+Escape` to Swaylock:
+
+```
+bindsym $mod+Escape exec swaylock --config ~/.config/swaylock/config
+```
+
+## Other application configurations
 
 ### Alacritty
 
-- Created `~/.config/alacritty/alacritty.toml`.
-- Set background opacity to `0.75` and configured window padding.
-- Set **JetBrainsMono Nerd Font** at size `12`.
-- Configured a blinking beam cursor.
-- Applied a Tokyo Night-inspired color palette.
-- Font files were installed under `~/.local/share/fonts/JetBrainsMono`.
+`configs/alacritty/alacritty.toml` configures:
+
+- Background opacity `0.75`
+- Window padding `12` horizontal, `10` vertical
+- JetBrainsMono Nerd Font at size `12`
+- Blinking beam cursor (interval `550ms`)
+- Tokyo Night color palette
 
 ### Waybar
 
-- Created a user-owned configuration and stylesheet based on the system defaults.
-- Applied Tokyo Night-inspired styling.
-- Set the bar to the bottom of the screen at height `32`.
-- Kept workspace and mode indicators on the left, with audio, network, battery, clock, and tray modules on the right.
+`configs/waybar/config.jsonc` and `configs/waybar/style.css` configure:
 
-Files: `~/.config/waybar/config.jsonc` and `~/.config/waybar/style.css`.
+- Bar position: bottom, height `32`
+- Left: Sway workspaces
+- Center: Clock
+- Right: PulseAudio, Network, Battery, Tray
+- Tokyo Night color scheme throughout
 
-### Sway appearance and keybindings
+### Rofi
 
-- Added Tokyo Night-inspired window border colors.
-- Set inner gaps to `6` and outer gaps to `3`.
-- Configured `Super+D` to open Rofi.
-- Configured `Super+Escape` to lock the screen using Swaylock.
-- Kept user overrides in the home directory rather than editing Fedora's packaged defaults.
+`configs/rofi/tokyonight.rasi` is a Tokyo Night color theme for Rofi.
+`configs/rofi/config.rasi` points to it via `@theme`.
 
-Relevant files:
+### Dunst
 
-- `~/.config/sway/config.d/10-wallpaper.conf`
-- `~/.config/sway/config.d/70-window-spacing.conf`
-- `~/.config/sway/config.d/80-tokyonight-borders.conf`
+`configs/dunst/dunstrc` configures:
 
-### GTK theme and icons
+- Tokyo Night colors for background, foreground, and frame
+- Urgency levels: low (5s timeout), normal (8s), critical (persistent)
+- JetBrainsMono Nerd Font at size `10`
+- Position: top-right with 12px offset
 
-- Applied the **Tokyonight-BL-MB-Dark-Moon** GTK theme.
-- Enabled the GTK dark preference.
-- Installed and selected **Papirus-Dark** icons.
+### Swaylock
 
-### Rofi and notifications
+`configs/swaylock/config` configures:
 
-- Styled Rofi with `~/.config/rofi/tokyonight.rasi`.
-- Configured Dunst with `~/.config/dunst/dunstrc` using Tokyo Night-inspired colors.
+- Dark background `#1a1b26`
+- Tokyo Night accent colors for ring, line, and text states
+- JetBrainsMono Nerd Font at size `18`
+- Failed attempt count display
 
-### Swaylock and idle behavior
+## Restoring from this repository
 
-- Created `~/.config/swaylock/config` with a matching dark theme.
-- Kept Fedora's default Sway idle policy unchanged. The inspected configuration locks after 300 seconds and turns the screen off 60 seconds after locking.
+To restore all version-controlled configuration files:
 
-### SDDM login screen
+```bash
+# Sway fragments
+cp configs/sway/config.d/*.conf ~/.config/sway/config.d/
 
-Created a separate Tokyo Night-inspired SDDM theme while leaving the packaged Fedora theme untouched.
+# Alacritty
+cp configs/alacritty/alacritty.toml ~/.config/alacritty/
 
-- Copied the packaged Sway/Fedora theme to `/usr/local/share/sddm/themes/TokyoNight`.
-- Selected it through `/etc/sddm.conf.d/99-tokyonight.conf`.
-- Copied the wallpaper to `/usr/local/share/backgrounds/tokyonight-login.png` so the greeter can read it without traversing a private home directory.
-- Updated the custom theme's `theme.conf` and `Main.qml`.
-- Styled the login panel as a dark rounded rectangle near the lower-right corner.
-- Changed clock, labels, prompts, and input text to light Tokyo Night colors.
-- Made username and password input backgrounds transparent.
-- Styled Login, Shutdown, and Reboot buttons with a consistent dark fill, light text, and subdued border.
+# Waybar
+cp configs/waybar/config.jsonc ~/.config/waybar/
+cp configs/waybar/style.css ~/.config/waybar/
 
-Relevant system-level paths:
+# Rofi
+cp configs/rofi/config.rasi ~/.config/rofi/
+cp configs/rofi/tokyonight.rasi ~/.config/rofi/
 
-- `/etc/sddm.conf.d/99-tokyonight.conf`
-- `/usr/local/share/sddm/themes/TokyoNight/theme.conf`
-- `/usr/local/share/sddm/themes/TokyoNight/Main.qml`
-- `/usr/local/share/backgrounds/tokyonight-login.png`
+# Dunst
+cp configs/dunst/dunstrc ~/.config/dunst/
 
-Backups created during editing included `Main.qml.bak` and `Main.qml.before-buttons` in the custom theme directory. They were created at different stages and may not both represent the final state.
-
-## Configuration locations
-
-```text
-~/.config/
-├── alacritty/alacritty.toml
-├── dunst/dunstrc
-├── rofi/tokyonight.rasi
-├── sway/config.d/
-│   ├── 10-wallpaper.conf
-│   ├── 70-window-spacing.conf
-│   └── 80-tokyonight-borders.conf
-├── swaylock/config
-└── waybar/
-    ├── config.jsonc
-    └── style.css
-
-~/.local/share/backgrounds/wallpaper.png
-~/.local/share/fonts/JetBrainsMono/
-
-/etc/sddm.conf.d/99-tokyonight.conf
-/usr/local/share/sddm/themes/TokyoNight/
-/usr/local/share/backgrounds/tokyonight-login.png
+# Swaylock
+cp configs/swaylock/config ~/.config/swaylock/
 ```
 
-## Verification and tests
+After restoring, reload Sway:
 
-These are desktop configuration and runtime checks, not an automated unit-test suite.
+```bash
+swaymsg reload
+```
 
-### Checks observed during setup
+Note: `swaymsg reload` reloads Sway configuration but does not necessarily reload
+each application's own stylesheet. Restart individual applications if changes
+do not appear.
 
-| Check | Recorded result |
-|---|---|
-| Desktop binaries | Sway, Waybar, Alacritty, Swaybg, and Rofi binaries were present. |
-| Waybar | The user reported that an earlier customization was working correctly. |
-| SDDM service | SDDM was active and enabled during inspection. |
-| SDDM configuration | The custom theme selection was written to `/etc/sddm.conf.d/99-tokyonight.conf`. |
-| SDDM preview | `/usr/bin/sddm-greeter-qt6 --test-mode --theme /usr/local/share/sddm/themes/TokyoNight` opened a preview successfully. |
-| Original SDDM theme | The packaged Fedora theme was copied, not edited in place. |
-| Overall appearance | The user reported that the desktop and login-screen changes looked good. |
+## Verification
 
-The Nerd Font was installed locally and selected in Alacritty. Use `fc-match` below to verify font resolution on the current system.
+### Checks performed during repository creation
 
-### Re-run checks after significant edits
+| Check | Result |
+|-------|--------|
+| All 7 Sway fragments present in `~/.config/sway/config.d/` | Confirmed |
+| Alacritty config present | Confirmed |
+| Waybar config and stylesheet present | Confirmed |
+| Rofi theme and config present | Confirmed |
+| Dunst config present | Confirmed |
+| Swaylock config present | Confirmed |
+| SDDM override file present at `/etc/sddm.conf.d/99-tokyonight.conf` | Confirmed |
+| SDDM theme directory present at `/usr/local/share/sddm/themes/TokyoNight/` | Confirmed |
+| Login wallpaper present at `/usr/local/share/backgrounds/tokyonight-login.png` | Confirmed |
+| Layered-include mechanism present at `/usr/libexec/sway/layered-include` | Confirmed |
+| No private paths in copied files | Confirmed |
+| Backup files excluded from snapshot | Confirmed |
 
-Run these commands from a terminal in the Sway session. They inspect configuration and runtime state; they do not change the setup.
+### Checks to perform after restoring
+
+Run these commands from a terminal in the Sway session:
 
 ```bash
 # Sway version and loaded configuration
 sway --version
 swaymsg -t get_config
-
-# Reload the Sway configuration
-swaymsg reload
-
-# List relevant user configuration files
-find ~/.config/sway/config.d ~/.config/waybar ~/.config/alacritty \
-  ~/.config/rofi ~/.config/dunst ~/.config/swaylock \
-  -maxdepth 2 -type f -print
 
 # Confirm the font is resolvable
 fc-match "JetBrainsMono Nerd Font"
@@ -175,13 +307,8 @@ pgrep -a waybar
 systemctl is-enabled sddm
 systemctl is-active sddm
 
-# Inspect SDDM theme selection and theme configuration
+# Inspect SDDM theme selection
 cat /etc/sddm.conf.d/99-tokyonight.conf
-cat /usr/local/share/sddm/themes/TokyoNight/theme.conf
-
-# Confirm the custom login wallpaper and QML file exist
-ls -l /usr/local/share/backgrounds/tokyonight-login.png
-ls -l /usr/local/share/sddm/themes/TokyoNight/Main.qml
 ```
 
 To preview the SDDM theme without logging out:
@@ -191,44 +318,31 @@ To preview the SDDM theme without logging out:
   --theme /usr/local/share/sddm/themes/TokyoNight
 ```
 
-Close the preview with **Alt+F4**, or press **Ctrl+C** in the terminal that launched it. A preview checks appearance but does not replace testing a real login.
-
 ### Manual acceptance checklist
 
-- [ ] Wallpaper appears and fills the display.
-- [ ] Alacritty uses the expected font, opacity, padding, cursor, and palette.
-- [ ] Waybar appears at the bottom with the expected modules and colors.
-- [ ] Window borders and gaps match the chosen style.
-- [ ] `Super+D` opens Rofi.
-- [ ] Dunst notifications use the custom theme.
-- [ ] `Super+Escape` locks the screen using Swaylock.
-- [ ] GTK applications use the dark theme and Papirus-Dark icons.
-- [ ] SDDM preview shows the wallpaper, lower-right panel, readable text, and consistent buttons.
-- [ ] A normal logout/login works before relying on the custom SDDM theme.
-- [ ] The configuration still works after a reboot.
-
-## Reloading and persistence
-
-- **Sway:** `swaymsg reload` reloads Sway configuration files. It does not necessarily restart applications or reload each application's own stylesheet.
-- **Waybar:** restart or signal Waybar if edits do not appear automatically.
-- **Alacritty:** open a new terminal window to verify changes; some settings apply to newly launched windows.
-- **Rofi, Dunst, and Swaylock:** test each application after changing its configuration.
-- **SDDM:** its configuration and theme are system-level files and persist through ordinary reboots. Use the greeter preview to inspect changes without restarting SDDM from the active desktop.
-- **Fedora Atomic:** `/etc` and `/usr/local` are intended for local configuration and normally persist through ordinary reboots and OS deployments. A system reset, reinstall, or disk replacement can remove them, so keep a separate backup.
-
-**Do not restart SDDM from the active graphical session as a routine test.** Restarting the display manager can terminate the current desktop session.
-
-## Troubleshooting and recovery
-
-1. **A style change does not appear:** check that the application is reading the intended user configuration, then restart the relevant application. `swaymsg reload` does not reload every application's configuration.
-2. **The font looks wrong:** run `fc-match "JetBrainsMono Nerd Font"` and check the files under `~/.local/share/fonts/JetBrainsMono`.
-3. **The SDDM wallpaper is missing:** check `/usr/local/share/backgrounds/tokyonight-login.png` and verify it is readable by the greeter.
-4. **The SDDM preview fails:** verify the theme directory and `Main.qml` exist, and review QML edits before attempting an actual logout.
-5. **Revert SDDM:** set `Current` in `/etc/sddm.conf.d/99-tokyonight.conf` back to the packaged theme `03-sway-fedora`, or temporarily move the custom override file aside. Keep the custom theme and backups until the fallback has been tested.
+- [ ] Wallpaper appears and fills the display
+- [ ] Alacritty uses the expected font, opacity, padding, cursor, and palette
+- [ ] Waybar appears at the bottom with the expected modules and colors
+- [ ] Window borders use Tokyo Night colors (focused: blue, unfocused: slate, urgent: red)
+- [ ] Single window fills the screen with no gaps
+- [ ] Multiple windows have no spacing between them or screen edges
+- [ ] `Super+D` opens Rofi
+- [ ] `Super+Return` opens Alacritty
+- [ ] Dunst notifications use the custom theme
+- [ ] `Super+Escape` locks the screen using Swaylock
+- [ ] GTK applications use the dark theme and Papirus-Dark icons
+- [ ] SDDM preview shows the wallpaper, lower-right panel, readable text, and consistent buttons
+- [ ] A normal logout/login works before relying on the custom SDDM theme
+- [ ] The configuration still works after a reboot
 
 ## Notes
 
-- This README summarizes the setup as captured in the conversation; it does not include every terminal command or intermediate experiment.
-- Re-run the checks above on the current machine before treating the checklist as a fresh test report.
-- Store this file as `README.md` in the repository where you keep your desktop configuration files, then commit it alongside the files you choose to version.
-- Review configs for private paths, machine-specific details, and secrets before publishing. This setup should not require passwords or API keys in configuration files.
+- This repository does not include an installer script. Restoration is manual.
+- The SDDM theme is documented separately under `system/sddm/` and requires
+  root privileges to install.
+- Backup files (`.bak`, `.before-*`) were excluded from this snapshot but
+  remain on the host system.
+- The `70-window-spacing.conf` fragment is kept even though its gap values are
+  overridden by `80-tokyonight-borders.conf`. This is intentional — it documents
+  the initial spacing configuration and the override relationship between
+  fragments.
