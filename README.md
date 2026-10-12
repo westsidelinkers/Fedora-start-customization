@@ -28,11 +28,27 @@ Fedora-start-customization/
 │   │   └── tokyonight.rasi
 │   ├── dunst/
 │   │   └── dunstrc
-│   └── swaylock/
-│       └── config
+│   ├── swaylock/
+│   │   └── config
+│   └── gtk/
+│       ├── gtk-3.0/settings.ini      GTK 3 theme and icon settings
+│       ├── gtk-4.0/settings.ini      GTK 4 theme and icon settings
+│       └── README.md                  GTK settings documentation
+├── docs/
+│   ├── assets.md                      External asset inventory
+│   └── RESTORE.md                     Restoration guide
+├── scripts/
+│   ├── restore.sh                     Safe configuration restoration
+│   └── recover.sh                     Backup recovery
+├── tests/
+│   └── run_tests.sh                   Automated test suite
 └── system/
     └── sddm/
-        └── README.md                  SDDM theme documentation
+        ├── README.md                  SDDM theme documentation
+        └── TokyoNight/
+            ├── Main.qml              Custom greeter QML (MIT-licensed derivative)
+            ├── theme.conf             Theme configuration
+            └── ATTRIBUTION.md        License and attribution details
 ```
 
 ## What is version-controlled
@@ -50,6 +66,8 @@ They are safe to restore by copying back to `~/.config/`.
 | `configs/rofi/tokyonight.rasi` | `~/.config/rofi/tokyonight.rasi` |
 | `configs/dunst/dunstrc` | `~/.config/dunst/dunstrc` |
 | `configs/swaylock/config` | `~/.config/swaylock/config` |
+| `configs/gtk/gtk-3.0/settings.ini` | `~/.config/gtk-3.0/settings.ini` |
+| `configs/gtk/gtk-4.0/settings.ini` | `~/.config/gtk-4.0/settings.ini` |
 
 ## What is documented separately (not version-controlled)
 
@@ -235,7 +253,30 @@ bindsym $mod+Escape exec swaylock --config ~/.config/swaylock/config
 
 ## Restoring from this repository
 
-To restore all version-controlled configuration files:
+### Quick start
+
+The safest way to restore configuration is with the restoration script:
+
+```bash
+# Preview what would be done (no changes)
+scripts/restore.sh --dry-run
+
+# Check for conflicts and missing assets
+scripts/restore.sh --check
+
+# Apply (install missing files, skip matching, report conflicts)
+scripts/restore.sh --apply
+
+# Apply with force (back up and replace conflicting files)
+scripts/restore.sh --apply --force
+```
+
+See [docs/RESTORE.md](docs/RESTORE.md) for full documentation of the restoration
+workflow, backup and recovery procedures, and conflict handling.
+
+### Manual restoration
+
+You can also copy files manually:
 
 ```bash
 # Sway fragments
@@ -257,6 +298,10 @@ cp configs/dunst/dunstrc ~/.config/dunst/
 
 # Swaylock
 cp configs/swaylock/config ~/.config/swaylock/
+
+# GTK settings
+cp configs/gtk/gtk-3.0/settings.ini ~/.config/gtk-3.0/
+cp configs/gtk/gtk-4.0/settings.ini ~/.config/gtk-4.0/
 ```
 
 After restoring, reload Sway:
@@ -335,9 +380,52 @@ To preview the SDDM theme without logging out:
 - [ ] A normal logout/login works before relying on the custom SDDM theme
 - [ ] The configuration still works after a reboot
 
+## GTK settings
+
+GTK theme and icon settings are captured in `configs/gtk/`:
+
+- **GTK 3 theme:** Tokyonight-BL-MB-Dark-Moon
+- **GTK 4 theme:** Tokyonight-BL-MB-Dark-Moon
+- **Icon theme:** Papirus-Dark
+- **Dark theme preference:** enabled
+
+These settings affect GTK 3 and GTK 4 applications only. They do not affect
+Qt/KDE applications, terminal emulators, Waybar, Dunst, Swaylock, or SDDM.
+See [configs/gtk/README.md](configs/gtk/README.md) for details on precedence,
+limitations, and verification.
+
+## External assets
+
+The following assets are **not** version-controlled and must be obtained
+separately:
+
+- **Wallpaper** — `~/.local/share/backgrounds/wallpaper.png`
+- **JetBrainsMono Nerd Font** — `~/.local/share/fonts/JetBrainsMono/`
+- **GTK theme** — `~/.themes/Tokyonight-BL-MB-Dark-Moon/` (GPL-3.0, from [Fausto-Korpsvart/Tokyonight-GTK-Theme](https://github.com/Fausto-Korpsvart/Tokyonight-GTK-Theme))
+- **Papirus-Dark icons** — package or manual install
+- **SDDM theme** — system-level, root-required
+
+See [docs/assets.md](docs/assets.md) for the complete inventory, licensing
+information, and manual installation instructions.
+
+## Testing
+
+The test suite verifies the restoration script's behavior using temporary
+directories:
+
+```bash
+tests/run_tests.sh
+```
+
+Tests verify dry-run safety, idempotent application, conflict preservation,
+backup creation, recovery, missing asset reporting, error handling, and
+path safety. All tests run in isolated temp directories and never touch the
+real home configuration.
+
 ## Notes
 
-- This repository does not include an installer script. Restoration is manual.
+- The restoration script (`scripts/restore.sh`) is the recommended way to
+  restore configuration. It is safe, idempotent, and non-destructive.
 - The SDDM theme is documented separately under `system/sddm/` and requires
   root privileges to install.
 - Backup files (`.bak`, `.before-*`) were excluded from this snapshot but
