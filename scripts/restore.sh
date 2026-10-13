@@ -289,8 +289,28 @@ record_action() {
 # ---------------------------------------------------------------------------
 # Execution (apply mode only)
 # ---------------------------------------------------------------------------
+#
+# Partial-application limitation: if the script is interrupted (e.g. SIGINT,
+# SIGTERM, or a disk-full error) after some files have been installed but
+# before others, the configuration directory will be in a partially-applied
+# state. Re-running the script will complete the installation — files that
+# already match are skipped, and missing files are installed. Backups are
+# only created for files that are replaced with --force.
 
 backup_dir=""
+
+# Generate a unique backup filename for a destination path.
+# Uses a hash of the path to avoid collisions between different destination
+# paths that would map to the same name after tr '/' '_'.
+backup_filename() {
+    local dst=$1
+    local rel=${dst#$CONFIG_DIR/}
+    local hash
+    hash=$(printf '%s' "$rel" | sha256sum | cut -c1-16)
+    local base
+    base=$(printf '%s' "$rel" | tr '/' '_')
+    printf '%s-%s' "$base" "$hash"
+}
 
 execute_plan() {
     local i src dst op backup_name
@@ -304,9 +324,20 @@ execute_plan() {
                 mkdir -p "$backup_dir"
                 : > "$backup_dir/manifest.txt"
             fi
-            backup_name=$(printf '%s' "${dst#$CONFIG_DIR/}" | tr '/' '_')
-            cp -P "$dst" "$backup_dir/$backup_name"
-            printf '%s\t%s\n' "$dst" "$backup_name" >> "$backup_dir/manifest.txt"
+            backup_name=$(backup_filename "$dst")
+            # Verify backup succeeds before removing the original
+            if ! cp -P "$dst" "$backup_dir/$backup_name"; then
+                printf 'restore.sh: backup failed for %s — skipping replacement\n' "$dst" >&2
+                count_errors=$((count_errors + 1))
+                continue
+            fi
+            # Verify the backup file exists and is non-empty
+            if [ ! -s "$backup_dir/$backup_name" ]; then
+                printf 'restore.sh: backup verification failed for %s — skipping replacement\n' "$dst" >&2
+                count_errors=$((count_errors + 1))
+                continue
+            fi
+            printf '%s\t%s\n' "${dst#$CONFIG_DIR/}" "$backup_name" >> "$backup_dir/manifest.txt"
             rm -f -- "$dst"
         fi
         mkdir -p -- "$(dirname -- "$dst")"
